@@ -148,4 +148,15 @@ FitGuru isn’t just another fitness app—it’s an **intelligent ecosystem** t
 FitGuru ensures every move, meal, and moment counts toward your best self.  
 
 ---
+
+## 👨‍💻 Team Members
+
+Meet the creators behind FitGuru — passionate innovators dedicated to redefining fitness through AI:
+
+- **[Paras Kadam](https://github.com/Paras2405)** — Computer Vision & Model Integration  
+- **[Rohan Suryavanshi](https://github.com/Matrixxx17)** — MATLAB Logic & Sensor Data Systems  
+- **[Atharva Karle](https://github.com/KARLE-ATHARVA)** — Generative AI & Chatbot Development  
+
+---
+
 **© FitGuru 2025** — *Your Complete Fitness, Perfectly Measured.*
