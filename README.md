@@ -153,9 +153,9 @@ FitGuru ensures every move, meal, and moment counts toward your best self.
 
 Meet the creators behind FitGuru — passionate innovators dedicated to redefining fitness through AI:
 
-- **[Paras Kadam](https://github.com/Paras2405)** — Computer Vision & Model Integration  
-- **[Rohan Suryavanshi](https://github.com/Matrixxx17)** — MATLAB Logic & Sensor Data Systems  
-- **[Atharva Karle](https://github.com/KARLE-ATHARVA)** — Generative AI & Chatbot Development  
+- **[Paras Kadam](https://github.com/Paras2405)**   
+- **[Rohan Suryavanshi](https://github.com/Matrixxx17)**  
+- **[Atharva Karle](https://github.com/KARLE-ATHARVA)**  
 
 ---
 
