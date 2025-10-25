@@ -1,0 +1,355 @@
+% final_fitness_tracker_V4.m
+% Connects to the mobile device, logs 10 seconds of ACCELERATION and POSITION data,
+% calculates DAS, Speed, Distance, Calories, and the Comprehensive Fitness Score (CFS).
+
+% --- 1. CONFIGURATION AND CONSTANTS ---
+DEVICE_NAME = "Redmi Note 12 5G"; % <-- CRITICAL: REPLACE THIS with your actual device name
+TRACKING_DURATION_S = 10; % 10 seconds for quick testing 
+FS = 10; % Assumed sampling frequency
+G = 9.81; % Acceleration due to gravity (m/s^2)
+dt = 1 / FS; % Time step
+
+% Scoring and Thresholds - TWEAKED FOR RELIABILITY
+% Dynamic Acceleration Magnitude Thresholds (m/s^2)
+MOTION_THRESHOLD = 0.4;  % Detects any motion above minor jitters.
+WALKING_THRESHOLD = 0.8; % A solid threshold for walking.
+RUNNING_THRESHOLD = 1.5; % For more vigorous movement.
+MIN_ACTIVE_TIME_SEC = 2; % Minimum consecutive active time to be considered "walking"
+TARGET_ACTIVE_TIME_S = 3600; % 60 min target for DAS=10
+MAX_DAS = 10;
+MAX_CFS = 15;
+R_EARTH = 6371000; % Earth radius in meters
+% Initial State Accumulators
+accumulated_active_time_s = 0;
+total_cumulative_distance_m = 0; % Total distance accumulator
+total_calories = 0;
+
+try
+    % --- Step 1: Connect to Mobile Device (Robust check) ---
+    clear M; % This ensures a new connection is established every time
+    fprintf('Step 1: Creating new connection to mobile device "%s"...\n', DEVICE_NAME);
+    M = mobiledev(DEVICE_NAME); 
+    
+    % --- Step 2: Start Dual Sensor Logging ---
+    fprintf('Step 2: Starting Acceleration and Position (GPS) logging.\n');
+    M.AccelerationSensorEnabled = 1; % Enable acceleration
+    M.PositionSensorEnabled = 1; % Enable GPS
+    M.logging = 1; % Start logging in the background
+    fprintf('------------------------------------------------------------------\n');
+    fprintf('** Device logging for the next %d seconds. MOVE your device! **\n', TRACKING_DURATION_S);
+    fprintf('------------------------------------------------------------------\n');
+    pause(TRACKING_DURATION_S); 
+    
+    % --- Step 3: Stop Logging and Retrieve Data ---
+    M.logging = 0; 
+    [a, t_accel] = accellog(M); % Retrieve logged acceleration data
+    [lat, lon, ~, spd, ~, t_pos, ~] = poslog(M); % Retrieve logged position data
+    discardlogs(M); 
+    
+    fprintf('Step 3: Data retrieved and logging stopped.\n');
+    
+    % --- 4. DATA PROCESSING AND METRIC CALCULATION ---
+    
+    % 4A. State and Speed from Acceleration
+    if isempty(a)
+        Active_Time_s_period = 0;
+        final_state = 'ERROR: NO ACCEL DATA';
+        peak_accel_mag = 0;
+        total_calories = 0;
+    else
+        % Remove gravity component and calculate dynamic magnitude
+        dynamic_a = a;
+        dynamic_a(:,3) = a(:,3) - G;
+        dynamic_mag = sqrt(sum(dynamic_a.^2, 2)); % Magnitude of dynamic acceleration
+        
+        % Filter out low-level noise
+        is_active = dynamic_mag > MOTION_THRESHOLD;
+        
+        % Determine final state based on a sustained period of activity
+        active_segments = find(is_active);
+        if isempty(active_segments)
+            final_state = 'AT REST';
+        else
+            % Check for a sustained period of motion
+            active_duration = sum(is_active) * dt;
+            if active_duration >= MIN_ACTIVE_TIME_SEC
+                % Classify based on max magnitude
+                peak_mag = max(dynamic_mag(is_active));
+                if peak_mag >= RUNNING_THRESHOLD
+                    final_state = 'RUNNING';
+                elseif peak_mag >= WALKING_THRESHOLD
+                    final_state = 'WALKING';
+                else
+                    final_state = 'ACTIVE'; % A new intermediate state for light activity
+                end
+            else
+                final_state = 'AT REST'; % Not enough sustained motion to be considered active
+            end
+        end
+
+        % Calculate total active time
+        Active_Time_s_period = sum(is_active) * dt;
+
+        % Calculate Calories based on states (using the updated logic)
+        total_calories = 0;
+        for i = 1:length(is_active)
+            if is_active(i)
+                % Use instantaneous magnitude to determine calorie rate
+                current_mag = dynamic_mag(i);
+                if current_mag >= RUNNING_THRESHOLD
+                    CalorieRate = 12;
+                elseif current_mag >= WALKING_THRESHOLD
+                    CalorieRate = 5;
+                else
+                    CalorieRate = 2; % Calories for light activity
+                end
+            else
+                CalorieRate = 1; % Calories for being at rest
+            end
+            total_calories = total_calories + (CalorieRate * dt * 0.1); 
+        end
+        peak_accel_mag = max(dynamic_mag);
+    end
+
+    % 4B. Distance and Location (Haversine Distance from GPS Data)a% final_fitness_tracker_V5.m
+% Connects to the mobile device, logs 10 seconds of ACCELERATION and POSITION data,
+% calculates DAS, Speed, Distance, Calories, and the Comprehensive Fitness Score (CFS).
+
+% --- 1. CONFIGURATION AND CONSTANTS ---
+DEVICE_NAME = "Redmi Note 12 5G"; % <-- CRITICAL: REPLACE THIS with your actual device name
+TRACKING_DURATION_S = 10; % 10 seconds for quick testing 
+FS = 10; % Assumed sampling frequency
+G = 9.81; % Acceleration due to gravity (m/s^2)
+dt = 1 / FS; % Time step
+% Scoring and Thresholds - TWEAKED FOR RELIABILITY
+% Dynamic Acceleration Magnitude Thresholds (m/s^2)
+MOTION_THRESHOLD = 0.4;  % Detects any motion above minor jitters.
+WALKING_THRESHOLD = 0.8; % A solid threshold for walking.
+RUNNING_THRESHOLD = 1.5; % For more vigorous movement.
+MIN_ACTIVE_TIME_SEC = 2; % Minimum consecutive active time to be considered "walking"
+TARGET_ACTIVE_TIME_S = 3600; % 60 min target for DAS=10
+MAX_DAS = 10;
+MAX_CFS = 15;
+R_EARTH = 6371000; % Earth radius in meters
+% Initial State Accumulators
+accumulated_active_time_s = 0;
+total_cumulative_distance_m = 0; % Total distance accumulator
+total_calories = 0;
+
+try
+    % --- Step 1: Connect to Mobile Device (Robust check) ---
+    clear M; % This ensures a new connection is established every time
+    fprintf('Step 1: Creating new connection to mobile device "%s"...\n', DEVICE_NAME);
+    M = mobiledev(DEVICE_NAME); 
+    
+    % --- Step 2: Start Dual Sensor Logging ---
+    fprintf('Step 2: Starting Acceleration and Position (GPS) logging.\n');
+    M.AccelerationSensorEnabled = 1; % Enable acceleration
+    M.PositionSensorEnabled = 1; % Enable GPS
+    M.logging = 1; % Start logging in the background
+    fprintf('------------------------------------------------------------------\n');
+    fprintf('** Device logging for the next %d seconds. MOVE your device! **\n', TRACKING_DURATION_S);
+    fprintf('------------------------------------------------------------------\n');
+    pause(TRACKING_DURATION_S); 
+    
+    % --- Step 3: Stop Logging and Retrieve Data ---
+    M.logging = 0; 
+    [a, t_accel] = accellog(M); % Retrieve logged acceleration data
+    [lat, lon, ~, spd, ~, t_pos, ~] = poslog(M); % Retrieve logged position data
+    discardlogs(M); 
+    
+    fprintf('Step 3: Data retrieved and logging stopped.\n');
+    
+    % --- 4. DATA PROCESSING AND METRIC CALCULATION ---
+    
+    % 4A. State and Speed from Acceleration
+    if isempty(a)
+        Active_Time_s_period = 0;
+        final_state = 'ERROR: NO ACCEL DATA';
+        peak_accel_mag = 0;
+        total_calories = 0;
+    else
+        % Remove gravity component and calculate dynamic magnitude
+        dynamic_a = a;
+        dynamic_a(:,3) = a(:,3) - G;
+        dynamic_mag = sqrt(sum(dynamic_a.^2, 2)); % Magnitude of dynamic acceleration
+        
+        % Smooth the dynamic magnitude data using a moving average filter
+        window_size = 5; % Number of samples to average
+        smoothed_dynamic_mag = movmean(dynamic_mag, window_size);
+
+        % Determine final state based on a sustained period of activity
+        is_active = smoothed_dynamic_mag > MOTION_THRESHOLD;
+        
+        % Check for a sustained period of motion
+        if sum(is_active) * dt >= MIN_ACTIVE_TIME_SEC
+            % The device has been in sustained motion
+            final_state = 'AT REST'; % Default state if no walking/running is detected
+            
+            % Classify based on max smoothed magnitude
+            peak_mag = max(smoothed_dynamic_mag);
+            if peak_mag >= RUNNING_THRESHOLD
+                final_state = 'RUNNING';
+            elseif peak_mag >= WALKING_THRESHOLD
+                final_state = 'WALKING';
+            else
+                final_state = 'ACTIVE'; % A new intermediate state for light activity
+            end
+        else
+            final_state = 'AT REST'; % Not enough sustained motion to be considered active
+        end
+
+        % Calculate total active time
+        Active_Time_s_period = sum(is_active) * dt;
+
+        % Calculate Calories based on states (using the updated logic)
+        total_calories = 0;
+        for i = 1:length(is_active)
+            if is_active(i)
+                % Use instantaneous magnitude to determine calorie rate
+                current_mag = smoothed_dynamic_mag(i);
+                if current_mag >= RUNNING_THRESHOLD
+                    CalorieRate = 12;
+                elseif current_mag >= WALKING_THRESHOLD
+                    CalorieRate = 5;
+                else
+                    CalorieRate = 2; % Calories for light activity
+                end
+            else
+                CalorieRate = 1; % Calories for being at rest
+            end
+            total_calories = total_calories + (CalorieRate * dt * 0.1); 
+        end
+        peak_accel_mag = max(dynamic_mag);
+    end
+
+    % 4B. Distance and Location (Haversine Distance from GPS Data)
+    if isempty(lat) || length(lat) < 2
+        TotalDistance_Report = 0;
+        location_string = 'Location data not available.';
+        peak_speed = 0;
+    else
+        % Use GPS data for distance calculation
+        TotalDistance_Report = 0;
+        for i = 2:length(lat)
+            lat1_rad = deg2rad(lat(i-1));
+            lon1_rad = deg2rad(lon(i-1));
+            lat2_rad = deg2rad(lat(i));
+            lon2_rad = deg2rad(lon(i));
+            dlon = lon2_rad - lon1_rad;
+            dlat = lat2_rad - lat1_rad;
+            a_h = sin(dlat/2)^2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon/2)^2;
+            c_h = 2 * atan2(sqrt(a_h), sqrt(1-a_h));
+            distance_segment = R_EARTH * c_h;
+            TotalDistance_Report = TotalDistance_Report + distance_segment;
+        end
+        % Use the more accurate speed from the GPS sensor if available
+        peak_speed = max(spd);
+        
+        % Location display - As requested, a more accurate location name requires an API.
+        % The previous code produced an error or 'location not found'. 
+        % This version shows the coordinates as a fallback.
+        location_string = sprintf('Lat: %.4f, Lon: %.4f', lat(end), lon(end));
+    end
+
+    % --- 5. SCORING (DAS & CFS) ---
+    DailyActiveTimeSeconds = accumulated_active_time_s + Active_Time_s_period;
+    DAS_raw = (DailyActiveTimeSeconds / TARGET_ACTIVE_TIME_S) * 10;
+    DAS = min(MAX_DAS, DAS_raw);
+    Distance_Score = min(5, (TotalDistance_Report / 1000) * 5); 
+    CFS = round((DAS + Distance_Score), 2); 
+    
+    % --- 6. FINAL DISPLAY REPORT ---
+    fprintf('\n======================================================\n');
+    fprintf('  REAL-TIME ADVANCED FITNESS TRACKER REPORT\n');
+    fprintf('======================================================\n');
+    fprintf('  Duration Sampled: %d seconds\n', TRACKING_DURATION_S);
+    fprintf('  \n');
+    fprintf('--- ACTIVITY & VELOCITY METRICS ---\n');
+    fprintf('  Peak Acceleration (Est.):  %.2f m/s^2\n', peak_accel_mag);
+    fprintf('  Peak Speed Reached (Est.): %.2f m/s\n', peak_speed);
+    fprintf('  Total Active Time (DAS):   %.1f seconds\n', Active_Time_s_period);
+    fprintf('  Total Distance Covered:    %.2f meters\n', TotalDistance_Report);
+    fprintf('  Total Calories Burned:     %.2f (Simplified)\n', total_calories);
+    fprintf('  Final Activity State:      %s\n', final_state);
+    fprintf('  \n');
+    fprintf('--- GEOSPATIAL METRICS ---\n');
+    fprintf('  REAL-TIME LOCATION:\n');
+    fprintf('  Location:                  %s\n', location_string);
+    fprintf('  \n');
+    fprintf('--- FITNESS SCORES ---\n');
+    fprintf('  Daily Activity Score (DAS): %.2f / %d\n', DAS, MAX_DAS);
+    fprintf('  *Comprehensive Fitness Score (CFS): %.2f / %d*\n', CFS, MAX_CFS);
+    fprintf('======================================================\n');
+catch ME
+    fprintf('\nAn error occurred during execution:\n');
+    fprintf('%s\n', ME.message);
+    if isequal(ME.identifier, 'MATLAB:UndefinedFunction') && contains(ME.message, 'mobiledev')
+        fprintf('ACTION REQUIRED: The MATLAB Support Package for Mobile Sensing may be missing.\n');
+    end
+end
+    if isempty(lat) || length(lat) < 2
+        TotalDistance_Report = 0;
+        location_string = 'Location data not available.';
+        peak_speed = 0;
+    else
+        % Use GPS data for distance calculation
+        TotalDistance_Report = 0;
+        for i = 2:length(lat)
+            lat1_rad = deg2rad(lat(i-1));
+            lon1_rad = deg2rad(lon(i-1));
+            lat2_rad = deg2rad(lat(i));
+            lon2_rad = deg2rad(lon(i));
+            dlon = lon2_rad - lon1_rad;
+            dlat = lat2_rad - lat1_rad;
+            a_h = sin(dlat/2)^2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon/2)^2;
+            c_h = 2 * atan2(sqrt(a_h), sqrt(1-a_h));
+            distance_segment = R_EARTH * c_h;
+            TotalDistance_Report = TotalDistance_Report + distance_segment;
+        end
+        % Use the more accurate speed from the GPS sensor if available
+        peak_speed = max(spd);
+        
+        % Location display - As requested, a more accurate location name requires an API.
+        % The previous code produced an error or 'location not found'. 
+        % This version shows the coordinates but you could use a placeholder function again.
+        % We will output the coordinates as a fallback.
+        location_string = sprintf('Lat: %.4f, Lon: %.4f', lat(end), lon(end));
+    end
+
+    % --- 5. SCORING (DAS & CFS) ---
+    DailyActiveTimeSeconds = accumulated_active_time_s + Active_Time_s_period;
+    DAS_raw = (DailyActiveTimeSeconds / TARGET_ACTIVE_TIME_S) * 10;
+    DAS = min(MAX_DAS, DAS_raw);
+    Distance_Score = min(5, (TotalDistance_Report / 1000) * 5); 
+    CFS = round((DAS + Distance_Score), 2); 
+    
+    % --- 6. FINAL DISPLAY REPORT ---
+    fprintf('\n======================================================\n');
+    fprintf('  REAL-TIME ADVANCED FITNESS TRACKER REPORT\n');
+    fprintf('======================================================\n');
+    fprintf('  Duration Sampled: %d seconds\n', TRACKING_DURATION_S);
+    fprintf('  \n');
+    fprintf('--- ACTIVITY & VELOCITY METRICS ---\n');
+    fprintf('  Peak Acceleration (Est.):  %.2f m/s^2\n', peak_accel_mag);
+    fprintf('  Peak Speed Reached (Est.): %.2f m/s\n', peak_speed);
+    fprintf('  Total Active Time (DAS):   %.1f seconds\n', Active_Time_s_period);
+    fprintf('  Total Distance Covered:    %.2f meters\n', TotalDistance_Report);
+    fprintf('  Total Calories Burned:     %.2f (Simplified)\n', total_calories);
+    fprintf('  Final Activity State:      %s\n', final_state);
+    fprintf('  \n');
+    fprintf('--- GEOSPATIAL METRICS ---\n');
+    fprintf('  REAL-TIME LOCATION:\n');
+    fprintf('  Location:                  %s\n', location_string);
+    fprintf('  \n');
+    fprintf('--- FITNESS SCORES ---\n');
+    fprintf('  Daily Activity Score (DAS): %.2f / %d\n', DAS, MAX_DAS);
+    fprintf('  *Comprehensive Fitness Score (CFS): %.2f / %d*\n', CFS, MAX_CFS);
+    fprintf('======================================================\n');
+catch ME
+    fprintf('\nAn error occurred during execution:\n');
+    fprintf('%s\n', ME.message);
+    if isequal(ME.identifier, 'MATLAB:UndefinedFunction') && contains(ME.message, 'mobiledev')
+        fprintf('ACTION REQUIRED: The MATLAB Support Package for Mobile Sensing may be missing.\n');
+    end
+end
